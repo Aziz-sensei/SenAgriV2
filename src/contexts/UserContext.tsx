@@ -52,12 +52,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     setUser(data.user);
 
-    // After login, sync the locally selected role to DB
-    if (data.user && role) {
-      try {
-        await supabase.from('profiles').upsert({ id: data.user.id, role });
-      } catch (err) {
-        console.error('UserContext: Error syncing role after login:', err);
+    // After login, fetch the role FROM the database (the role set at signup)
+    // Do NOT overwrite with locally selected role — the DB role is the source of truth
+    if (data.user) {
+      const profile = await fetchProfile(data.user.id);
+      if (profile) {
+        console.log('UserContext: Role loaded from DB after login:', profile.role);
+        localStorage.setItem('senagri_role', profile.role);
       }
     }
   };
@@ -116,21 +117,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         try {
           setUser(session?.user ?? null);
           if (session?.user) {
-            // The role the user selected BEFORE logging in (from localStorage or state)
-            const selectedRole = role || (localStorage.getItem('senagri_role') as Role);
-            
             const profile = await fetchProfile(session.user.id);
             
-            // If user has a locally selected role, ALWAYS sync it to the DB
-            // This fixes the bug where the auto-trigger creates profile with 'consumer'
-            // but the user actually selected 'producer'
-            if (selectedRole && (!profile || profile.role !== selectedRole)) {
-              console.log('UserContext: Syncing selected role to DB:', selectedRole);
-              await supabase.from('profiles').upsert({ id: session.user.id, role: selectedRole });
-              setRoleState(selectedRole);
+            if (profile) {
+              // User has a profile in DB → use the DB role (source of truth)
+              console.log('UserContext: Using DB role:', profile.role);
+              setRoleState(profile.role as Role);
+              localStorage.setItem('senagri_role', profile.role);
+            } else {
+              // NEW user (just signed up, no profile yet or trigger hasn't run)
+              // Save the locally selected role to DB
+              const selectedRole = role || (localStorage.getItem('senagri_role') as Role);
+              if (selectedRole) {
+                console.log('UserContext: New user, saving selected role to DB:', selectedRole);
+                await supabase.from('profiles').upsert({ id: session.user.id, role: selectedRole });
+                setRoleState(selectedRole);
+              }
             }
           } else {
-            // Not logged in — keep the locally selected role
+            // Not logged in — keep the locally selected role for role selection page
           }
         } catch (err) {
           console.error('Auth change error:', err);
@@ -166,29 +171,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const handleSetRole = async (newRole: Role) => {
     console.log('UserContext: Setting role to', newRole);
     
-    // 1. Update local state immediately (Optimistic UI)
+    // 1. Update local state immediately (for role selection page before login)
     setRoleState(newRole);
     if (newRole) {
       localStorage.setItem('senagri_role', newRole);
     } else {
       localStorage.removeItem('senagri_role');
+      // If clearing role (e.g. going back), also clear user
+      // so they go back to role selection
+      setUser(null);
     }
 
-    // 2. Sync with Supabase in the background if possible
-    if (isSupabaseConfigured() && user) {
-      console.log('UserContext: Syncing role to Supabase...');
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({ id: user.id, role: newRole });
-        
-        if (error) throw error;
-        console.log('UserContext: Role synced successfully');
-      } catch (err) {
-        console.error('UserContext: Error syncing role (background):', err);
-        // We don't revert the local state here to keep the UI fluid
-      }
-    }
+    // 2. Only sync with Supabase if user is logged in AND explicitly changing role
+    // This should NOT happen during normal flow — role is set at signup only
+    // But we keep it for admin override if needed
   };
 
   const logout = async () => {

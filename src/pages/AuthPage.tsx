@@ -39,6 +39,7 @@ export const AuthPage = () => {
 
     try {
       if (isLogin) {
+        // LOGIN: the role will be fetched from DB inside login(), not from local selection
         await login(cleanEmail, cleanPassword);
       } else {
         if (!isSupabaseConfigured()) {
