@@ -70,7 +70,7 @@ export const AuthPage = () => {
             <Settings className="shrink-0 mt-0.5" size={18} />
             <div>
               <p className="font-bold mb-1">Configuration requise</p>
-              <p>Veuillez ajouter vos identifiants Supabase dans les <strong>Secrets</strong> d'AI Studio pour activer l'authentification.</p>
+              <p>Veuillez configurer vos identifiants Supabase (<code>VITE_SUPABASE_URL</code> et <code>VITE_SUPABASE_ANON_KEY</code>) dans un fichier <strong>.env</strong> pour activer l'authentification.</p>
             </div>
           </div>
         )}

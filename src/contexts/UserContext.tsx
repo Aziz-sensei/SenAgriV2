@@ -188,7 +188,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     localStorage.removeItem('senagri_role');
     localStorage.removeItem('senagri_cart'); // Clear cart too on logout
-    localStorage.removeItem('sb-ais-dev-7ea2k3pm6vmpdaatloio3y-92540669575-auth-token'); // Clear supabase token manually if needed
+    localStorage.removeItem('sb-guhhfjtbybhjolnnwijy-auth-token'); // Clear supabase token manually if needed
     
     console.log('UserContext: Local state and storage cleared');
 
