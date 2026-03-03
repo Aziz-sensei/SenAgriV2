@@ -44,12 +44,26 @@ export const AuthPage = () => {
         if (!isSupabaseConfigured()) {
           throw new Error("Supabase n'est pas configuré. Si vous êtes sur Vercel, ajoutez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans les variables d'environnement.");
         }
-        const { error } = await supabase.auth.signUp({ 
+        const { error, data } = await supabase.auth.signUp({ 
           email: cleanEmail, 
           password: cleanPassword 
         });
         if (error) throw error;
-        alert('Vérifiez votre boîte mail pour confirmer votre inscription !');
+
+        // If signup was auto-confirmed (no email verification), sync role immediately
+        if (data.user && !data.user.identities?.length) {
+          // User already exists
+          throw new Error('Un compte avec cet email existe déjà. Essayez de vous connecter.');
+        }
+        
+        if (data.session) {
+          // Auto-confirmed: sync role to DB right away
+          if (data.user && role) {
+            await supabase.from('profiles').upsert({ id: data.user.id, role });
+          }
+        } else {
+          alert('Vérifiez votre boîte mail pour confirmer votre inscription !');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Une erreur est survenue');

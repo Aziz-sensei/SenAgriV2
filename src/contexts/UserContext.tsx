@@ -51,6 +51,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
     if (error) throw error;
     setUser(data.user);
+
+    // After login, sync the locally selected role to DB
+    if (data.user && role) {
+      try {
+        await supabase.from('profiles').upsert({ id: data.user.id, role });
+      } catch (err) {
+        console.error('UserContext: Error syncing role after login:', err);
+      }
+    }
   };
 
   useEffect(() => {
@@ -107,19 +116,21 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         try {
           setUser(session?.user ?? null);
           if (session?.user) {
-            // Check if we have a pending role in localStorage/state
-            const currentRole = role || (localStorage.getItem('senagri_role') as Role);
+            // The role the user selected BEFORE logging in (from localStorage or state)
+            const selectedRole = role || (localStorage.getItem('senagri_role') as Role);
             
             const profile = await fetchProfile(session.user.id);
             
-            // If user logged in but has no profile in DB, and we have a selected role, save it
-            if (!profile && currentRole) {
-              await supabase.from('profiles').upsert({ id: session.user.id, role: currentRole });
-              setRoleState(currentRole);
+            // If user has a locally selected role, ALWAYS sync it to the DB
+            // This fixes the bug where the auto-trigger creates profile with 'consumer'
+            // but the user actually selected 'producer'
+            if (selectedRole && (!profile || profile.role !== selectedRole)) {
+              console.log('UserContext: Syncing selected role to DB:', selectedRole);
+              await supabase.from('profiles').upsert({ id: session.user.id, role: selectedRole });
+              setRoleState(selectedRole);
             }
           } else {
-            // Only clear role if we are actually using Supabase
-            // If not logged in, we keep the locally selected role
+            // Not logged in — keep the locally selected role
           }
         } catch (err) {
           console.error('Auth change error:', err);
