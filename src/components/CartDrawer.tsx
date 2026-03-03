@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ShoppingBag, Trash2, Plus, Minus, Truck, MapPin, ArrowRight } from 'lucide-react';
+import { X, ShoppingBag, Trash2, Plus, Minus, Truck, MapPin, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useProducts } from '../contexts/ProductContext';
 import { Button } from './ui/Button';
@@ -27,6 +27,7 @@ export const CartDrawer = () => {
   const { products } = useProducts();
 
   const [isCheckingOut, setIsCheckingOut] = React.useState(false);
+  const [confirmedOrder, setConfirmedOrder] = React.useState<any>(null);
 
   const handleCheckout = async () => {
     setIsCheckingOut(true);
@@ -34,12 +35,16 @@ export const CartDrawer = () => {
     setIsCheckingOut(false);
     
     if (order) {
-      setIsCartOpen(false);
-      alert('Commande réussie ! Merci de votre confiance. Nous vous contacterons bientôt pour la livraison.');
-      navigate('/');
+      setConfirmedOrder(order);
     } else {
       alert('Une erreur est survenue lors de la commande. Veuillez vérifier votre connexion.');
     }
+  };
+
+  const handleCloseConfirmation = () => {
+    setConfirmedOrder(null);
+    setIsCartOpen(false);
+    navigate('/');
   };
 
   return (
@@ -82,7 +87,58 @@ export const CartDrawer = () => {
 
             {/* Content */}
             <div className="flex-grow overflow-y-auto p-6 space-y-6 no-scrollbar">
-              {items.length === 0 ? (
+              {confirmedOrder ? (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-6 py-8">
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', damping: 15 }}
+                  >
+                    <CheckCircle2 size={80} className="text-green-500 mx-auto" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-1">Commande Confirmée !</h3>
+                    <p className="text-gray-500 text-sm">Merci de soutenir l'agriculture locale</p>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-2xl p-5 w-full text-left space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">N° Commande</span>
+                      <span className="font-mono font-bold text-green-700">
+                        {confirmedOrder.id?.substring(0, 8).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Total payé</span>
+                      <span className="font-bold text-lg">{formatFCFA(confirmedOrder.total)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Statut</span>
+                      <span className="inline-flex items-center gap-1 text-yellow-600 font-bold text-xs bg-yellow-50 px-2 py-1 rounded-full">
+                        ● En préparation
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Date</span>
+                      <span className="font-medium">
+                        {new Date(confirmedOrder.createdAt).toLocaleString('fr-FR')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Paiement</span>
+                      <span className="font-medium">À la livraison</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-400">
+                    Nous vous contacterons pour confirmer la livraison.
+                  </p>
+
+                  <Button className="w-full" onClick={handleCloseConfirmation}>
+                    Retour au catalogue
+                  </Button>
+                </div>
+              ) : items.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
                   <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
                     <ShoppingBag size={40} />

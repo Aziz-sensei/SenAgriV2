@@ -87,10 +87,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     if (isSupabaseConfigured()) {
       try {
-        // 1. Create order
+        // 0. Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+
+        // 1. Create order WITH user_id
         const { data: order, error: orderError } = await supabase
           .from('orders')
           .insert([{ 
+            user_id: user?.id,
             total: currentTotal, 
             status: 'pending',
             delivery_method: deliveryMethod
@@ -98,30 +102,52 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           .select()
           .single();
 
-        if (orderError) throw orderError;
-
-        // 2. Create order items
-        const orderItems = currentItems.map(item => {
-          const product = products.find(p => p.id === item.productId);
-          return {
-            order_id: order.id,
-            product_id: item.productId,
-            quantity: item.quantity,
-            price_at_time: product?.price || 0
-          };
-        });
-
-        const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-        if (itemsError) throw itemsError;
-
-        // 3. Update stocks
-        for (const item of currentItems) {
-          await updateStock(item.productId, item.quantity);
+        if (orderError) {
+          console.error('Order insert error:', orderError);
+          throw orderError;
         }
 
-        setOrders(prev => [order, ...prev]);
+        // 2. Create order items (only for valid UUID product IDs from Supabase)
+        const orderItems = currentItems
+          .filter(item => {
+            // UUID v4 pattern check — skip mock product IDs like '1', '2', 'p-1'
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.productId);
+            return isUUID;
+          })
+          .map(item => {
+            const product = products.find(p => p.id === item.productId);
+            return {
+              order_id: order.id,
+              product_id: item.productId,
+              quantity: item.quantity,
+              price_at_time: product?.price || 0
+            };
+          });
+
+        if (orderItems.length > 0) {
+          const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+          if (itemsError) {
+            console.error('Order items insert error:', itemsError);
+            throw itemsError;
+          }
+        }
+
+        // 3. Update stocks (subtract quantity)
+        for (const item of currentItems) {
+          await updateStock(item.productId, -item.quantity);
+        }
+
+        const confirmedOrder: Order = {
+          id: order.id,
+          items: currentItems,
+          total: currentTotal,
+          status: 'pending',
+          createdAt: order.created_at || new Date().toISOString()
+        };
+
+        setOrders(prev => [confirmedOrder, ...prev]);
         clearCart();
-        return order;
+        return confirmedOrder;
       } catch (err) {
         console.error('Checkout error with Supabase:', err);
         return null;
@@ -129,7 +155,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     } else {
       // Mock checkout
       for (const item of currentItems) {
-        await updateStock(item.productId, item.quantity);
+        await updateStock(item.productId, -item.quantity);
       }
       setOrders(prev => [newOrder, ...prev]);
       clearCart();

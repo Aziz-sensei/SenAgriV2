@@ -27,36 +27,62 @@ export const CartPage = () => {
   const { products } = useProducts();
   const [isOrdered, setIsOrdered] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
 
   const handleCheckout = async () => {
     setIsProcessing(true);
     const order = await checkout();
     setIsProcessing(false);
     if (order) {
+      setConfirmedOrder(order);
       setIsOrdered(true);
-      setTimeout(() => navigate('/'), 3000);
     } else {
       alert("Une erreur est survenue lors de la commande. Veuillez réessayer.");
     }
   };
 
-  if (isOrdered) {
+  if (isOrdered && confirmedOrder) {
     return (
-      <div className="max-w-md mx-auto py-20 px-4 text-center">
+      <div className="max-w-lg mx-auto py-16 px-4 text-center">
         <motion.div 
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-green-50 p-12 rounded-3xl border-2 border-green-100"
+          className="bg-green-50 p-10 rounded-3xl border-2 border-green-100"
         >
-          <CheckCircle2 size={64} className="text-green-600 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold mb-2">Commande Confirmée !</h2>
-          <p className="text-gray-600 mb-8">Merci de soutenir l'agriculture locale. Votre commande est en cours de préparation.</p>
-          <div className="space-y-4">
-            <p className="text-xs text-gray-400 animate-pulse">Redirection vers l'accueil...</p>
-            <Link to="/">
-              <Button variant="outline" className="w-full">Retour à l'accueil</Button>
-            </Link>
+          <CheckCircle2 size={72} className="text-green-600 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold mb-2">Commande Confirmée !</h2>
+          <p className="text-gray-600 mb-6">Merci de soutenir l'agriculture locale.</p>
+          
+          <div className="bg-white rounded-2xl p-6 text-left space-y-3 mb-6 shadow-sm">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">N° Commande</span>
+              <span className="font-mono font-bold text-green-700">{confirmedOrder.id?.substring(0, 8).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Total</span>
+              <span className="font-bold">{formatFCFA(confirmedOrder.total)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Statut</span>
+              <span className="inline-flex items-center gap-1 text-yellow-600 font-bold text-xs bg-yellow-50 px-2 py-1 rounded-full">
+                ● En préparation
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Date</span>
+              <span className="font-medium">{new Date(confirmedOrder.createdAt).toLocaleString('fr-FR')}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Paiement</span>
+              <span className="font-medium">À la livraison</span>
+            </div>
           </div>
+
+          <p className="text-xs text-gray-400 mb-6">Nous vous contacterons pour confirmer la livraison.</p>
+          
+          <Link to="/">
+            <Button className="w-full">Retour au catalogue</Button>
+          </Link>
         </motion.div>
       </div>
     );
